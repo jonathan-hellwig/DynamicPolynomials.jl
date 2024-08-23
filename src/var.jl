@@ -8,23 +8,20 @@ function polyarrayvar(
     namespace,
     indices...,
 )
+    name = if isnothing(namespace)
+        "$var"
+    else
+        "$(namespace).$var"
+    end
     return map(
         i -> Variable(
-            "$(varname(namespace, prefix))[$(join(i, ","))]",
+            "$(name)[$(join(i, ","))]",
             variable_order,
             monomial_order,
             complex_kind,
         ),
         Iterators.product(indices...),
     )
-end
-
-function varname(namespace, var)
-    if isnothing(namespace)
-        return "$var"
-    else
-        return "$(namespace).$var"
-    end
 end
 
 function buildpolyvar(
@@ -34,11 +31,16 @@ function buildpolyvar(
     complex_kind,
     namespace,
 )
+    name = if isnothing(namespace)
+        "$var"
+    else
+        "$(namespace).$var"
+    end
     if isa(var, Symbol)
         var,
         :(
             $(esc(var)) = $Variable(
-                $"$(varname(namespace, var))",
+                $"$(name)",
                 $variable_order,
                 $monomial_order,
                 $complex_kind,
