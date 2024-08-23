@@ -106,3 +106,7 @@ end
     _test_monomials([x, y], 1:2, [y, x, y^2, x * y, x^2])
     _test_monomials([x, y], [0, 1, 3], [1, y, x, y^3, x*y^2, x^2*y, x^3])
 end
+
+@testset "Namespaces" begin
+    @polyvar x y z namespace = model
+end

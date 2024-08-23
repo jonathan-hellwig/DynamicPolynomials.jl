@@ -5,11 +5,12 @@ function polyarrayvar(
     monomial_order,
     complex_kind,
     prefix,
+    namespace,
     indices...,
 )
     return map(
         i -> Variable(
-            "$(prefix)[$(join(i, ","))]",
+            "$(varname(namespace, prefix))[$(join(i, ","))]",
             variable_order,
             monomial_order,
             complex_kind,
@@ -18,12 +19,26 @@ function polyarrayvar(
     )
 end
 
-function buildpolyvar(var, variable_order, monomial_order, complex_kind)
+function varname(namespace, var)
+    if isnothing(namespace)
+        return "$var"
+    else
+        return "$(namespace).$var"
+    end
+end
+
+function buildpolyvar(
+    var,
+    variable_order,
+    monomial_order,
+    complex_kind,
+    namespace,
+)
     if isa(var, Symbol)
         var,
         :(
             $(esc(var)) = $Variable(
-                $"$var",
+                $"$(varname(namespace, var))",
                 $variable_order,
                 $monomial_order,
                 $complex_kind,
@@ -44,18 +59,30 @@ function buildpolyvar(var, variable_order, monomial_order, complex_kind)
                 $(monomial_order),
                 $(complex_kind),
                 $prefix,
+                $namespace,
                 $(esc.(var.args[2:end])...),
             )
         )
     end
 end
 
-function buildpolyvars(args, variable_order, monomial_order, complex_kind)
+function buildpolyvars(
+    args,
+    variable_order,
+    monomial_order,
+    complex_kind,
+    namespace,
+)
     vars = Symbol[]
     exprs = []
     for arg in args
-        var, expr =
-            buildpolyvar(arg, variable_order, monomial_order, complex_kind)
+        var, expr = buildpolyvar(
+            arg,
+            variable_order,
+            monomial_order,
+            complex_kind,
+            namespace,
+        )
         push!(vars, var)
         push!(exprs, expr)
     end
@@ -63,7 +90,12 @@ function buildpolyvars(args, variable_order, monomial_order, complex_kind)
 end
 
 # Inspired from `JuMP.Containers._extract_kw_args`
-function _extract_kw_args(args, variable_order, complex_kind)
+function _extract_kw_args(
+    args,
+    variable_order,
+    complex_kind,
+    namespace = nothing,
+)
     positional_args = Any[]
     monomial_order = :($(MP.Graded{MP.LexOrder}))
     for arg in args
@@ -74,6 +106,8 @@ function _extract_kw_args(args, variable_order, complex_kind)
                 monomial_order = esc(arg.args[2])
             elseif arg.args[1] == :complex
                 complex_kind = arg.args[2] == :true ? COMPLEX : REAL
+            elseif arg.args[1] == :namespace
+                namespace = arg.args[2]
             else
                 error("Unrecognized keyword argument `$(arg.args[1])`")
             end
@@ -81,15 +115,24 @@ function _extract_kw_args(args, variable_order, complex_kind)
             push!(positional_args, arg)
         end
     end
-    return positional_args, variable_order, monomial_order, complex_kind
+    return positional_args,
+    variable_order,
+    monomial_order,
+    complex_kind,
+    namespace
 end
 
 # Variable vector x returned garanteed to be sorted so that if p is built with x then vars(p) == x
 macro polyvar(args...)
-    pos_args, variable_order, monomial_order, complex_kind =
+    pos_args, variable_order, monomial_order, complex_kind, namespace =
         _extract_kw_args(args, :($(Commutative{CreationOrder})), REAL)
-    vars, exprs =
-        buildpolyvars(pos_args, variable_order, monomial_order, complex_kind)
+    vars, exprs = buildpolyvars(
+        pos_args,
+        variable_order,
+        monomial_order,
+        complex_kind,
+        namespace,
+    )
     return :($(foldl((x, y) -> :($x; $y), exprs, init = :()));
     $(Expr(:tuple, esc.(vars)...)))
 end
@@ -97,8 +140,13 @@ end
 macro ncpolyvar(args...)
     pos_args, variable_order, monomial_order, complex_kind =
         _extract_kw_args(args, :($(NonCommutative{CreationOrder})), REAL)
-    vars, exprs =
-        buildpolyvars(pos_args, variable_order, monomial_order, complex_kind)
+    vars, exprs = buildpolyvars(
+        pos_args,
+        variable_order,
+        monomial_order,
+        complex_kind,
+        namespace,
+    )
     return :($(foldl((x, y) -> :($x; $y), exprs, init = :()));
     $(Expr(:tuple, esc.(vars)...)))
 end
@@ -106,8 +154,13 @@ end
 macro complex_polyvar(args...)
     pos_args, variable_order, monomial_order, complex_kind =
         _extract_kw_args(args, :($(Commutative{CreationOrder})), COMPLEX)
-    vars, exprs =
-        buildpolyvars(pos_args, variable_order, monomial_order, complex_kind)
+    vars, exprs = buildpolyvars(
+        pos_args,
+        variable_order,
+        monomial_order,
+        complex_kind,
+        namespace,
+    )
     return :($(foldl((x, y) -> :($x; $y), exprs, init = :()));
     $(Expr(:tuple, esc.(vars)...)))
 end
